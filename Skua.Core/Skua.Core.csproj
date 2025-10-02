@@ -18,6 +18,7 @@
     <PackageReference Include="Caseless.Fody" Version="1.9.1" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.1.0" />
     <PackageReference Include="CoreHook" Version="1.0.4" />
+    <PackageReference Include="FSharp.Compiler.Service" Version="43.7.300" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Westwind.Scripting" Version="1.2.1" />

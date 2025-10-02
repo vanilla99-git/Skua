@@ -35,6 +35,7 @@ public static class Services
     public static IServiceCollection AddCompiler(this IServiceCollection services)
     {
         services.AddTransient(CreateCompiler);
+        services.AddTransient<FSharpScriptCompiler>();
 
         return services;
     }
