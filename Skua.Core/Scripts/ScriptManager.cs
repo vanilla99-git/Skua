@@ -199,26 +199,44 @@ public partial class ScriptManager : ObservableObject, IScriptManager
     {
         var sw = Stopwatch.StartNew();
         var references = GetReferences();
-        var final = ProcessSources(source, ref references);
-        var tree = CSharpSyntaxTree.ParseText(final, encoding: Encoding.UTF8);
-        
-        CompiledScript = final = tree.GetRoot().NormalizeWhitespace().ToFullString();
-        Compiler compiler = Ioc.Default.GetRequiredService<Compiler>();
-        
-        if (references.Count > 0)
-            compiler.AddAssemblies(references.ToArray());
+        bool isFSharp = IsFSharpScript(LoadedScript);
 
-        dynamic? assembly = compiler.CompileClass(final);
+        string final;
+        object? scriptInstance;
+
+        if (isFSharp)
+        {
+            final = source;
+            CompiledScript = final;
+
+            var compiler = Ioc.Default.GetRequiredService<FSharpScriptCompiler>();
+            string assemblyName = GetScriptAssemblyName();
+            scriptInstance = compiler.Compile(final, references, assemblyName);
+        }
+        else
+        {
+            final = ProcessSources(source, ref references);
+            var tree = CSharpSyntaxTree.ParseText(final, encoding: Encoding.UTF8);
+
+            CompiledScript = final = tree.GetRoot().NormalizeWhitespace().ToFullString();
+            Compiler compiler = Ioc.Default.GetRequiredService<Compiler>();
+
+            if (references.Count > 0)
+                compiler.AddAssemblies(references.ToArray());
+
+            scriptInstance = compiler.CompileClass(final);
+
+            if (compiler.Error)
+                throw new ScriptCompileException(compiler.ErrorMessage, compiler.GeneratedClassCodeWithLineNumbers);
+        }
 
         sw.Stop();
         Trace.WriteLine($"Script compilation took {sw.ElapsedMilliseconds}ms.");
 
-        File.WriteAllText(Path.Combine(ClientFileSources.SkuaScriptsDIR, "z_CompiledScript.cs"), final);
+        string compiledExtension = isFSharp ? ".fs" : ".cs";
+        File.WriteAllText(Path.Combine(ClientFileSources.SkuaScriptsDIR, $"z_CompiledScript{compiledExtension}"), final);
 
-        if (compiler.Error)
-            throw new ScriptCompileException(compiler.ErrorMessage, compiler.GeneratedClassCodeWithLineNumbers);
-
-        return assembly;
+        return scriptInstance;
     }
 
     private HashSet<string> GetReferences()
@@ -358,5 +376,24 @@ public partial class ScriptManager : ObservableObject, IScriptManager
     public void SetLoadedScript(string path)
     {
         LoadedScript = path;
+    }
+
+    private static bool IsFSharpScript(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return false;
+
+        string extension = Path.GetExtension(path);
+        return extension.Equals(".fs", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".fsx", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string GetScriptAssemblyName()
+    {
+        if (string.IsNullOrWhiteSpace(LoadedScript))
+            return "SkuaFSharpScript";
+
+        string? name = Path.GetFileNameWithoutExtension(LoadedScript);
+        return string.IsNullOrWhiteSpace(name) ? "SkuaFSharpScript" : name;
     }
 }
